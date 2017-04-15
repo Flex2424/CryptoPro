@@ -12,6 +12,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
+
 namespace CryptoProServer
 {
     public partial class Form1 : Form
@@ -23,69 +24,42 @@ namespace CryptoProServer
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            TcpListener server = null;
+            Thread main_thread = new Thread(check_response);
+            main_thread.Start();
+        }
+
+        private void check_response()
+        {
+            NetworkStream ns;
+            TcpClient client = null;
             try
             {
-                int MaxThreadsCount = Environment.ProcessorCount * 4;
-                richTextBox1.ReadOnly = true;
-                richTextBox1.Text = "Max Threads: " + MaxThreadsCount.ToString();
-                ThreadPool.SetMaxThreads(MaxThreadsCount, MaxThreadsCount);
-                ThreadPool.SetMinThreads(2, 2);
+                TcpListener listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 9595);
+                listener.Start();
 
-                Int32 port = 9595;
-                IPAddress local_addr = IPAddress.Parse("127.0.0.1");
-                int counter = 0;
-                server = new TcpListener(local_addr, port);
-                server.Start();
+                Byte[] bytes = new Byte[256];
+                String data = null;
 
                 while (true)
                 {
-                    richTextBox1.Text += "Waiting for connection...";
-                    ThreadPool.QueueUserWorkItem(processing_response, server.AcceptTcpClient());
-                    counter++;
-                    richTextBox1.Text +="\nConnection #" + counter.ToString() + "!";
-                }
+                    client = listener.AcceptTcpClient();
+                    NetworkStream stream = client.GetStream();
+
+                    int i;
+                    while ((i = stream.Read(bytes, 0, bytes.Length)) != 0)
+                    {
+                        data = System.Text.Encoding.ASCII.GetString(bytes, 0, i);
+                        richTextBox1.Text = DateTime.Now.ToString() + "\n";
+                        richTextBox1.Text += data;
+                    }
+                    client.Close();
+                }                
             }
             catch (SocketException exception)
             {
                 MessageBox.Show("SocketException: " + exception);
             }
-            finally
-            {
-                server.Stop();
-            }
         }
 
-        public void processing_response(object client_obj)
-        {
-            Byte[] bytes = new Byte[256];
-            String data = null;
-
-            TcpClient client = client_obj as TcpClient;
-
-            data = null;
-
-            NetworkStream stream = client.GetStream();
-            
-            int i;
-
-            while ((i = stream.Read(bytes, 0, bytes.Length)) != 0)
-            {
-                // Преобразуем данные в ASCII string.
-                data = System.Text.Encoding.ASCII.GetString(bytes, 0, i);
-
-                // Преобразуем строку к верхнему регистру.
-                data = data.ToUpper();
-
-                // Преобразуем полученную строку в массив Байт.
-                byte[] msg = System.Text.Encoding.ASCII.GetBytes(data);
-
-                // Отправляем данные обратно клиенту (ответ).
-                stream.Write(msg, 0, msg.Length);
-
-            }
-
-            client.Close();
-        }
     }
 }
