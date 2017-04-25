@@ -11,10 +11,21 @@ using System.Windows.Forms;
 using System.Net;
 using System.Net.Sockets;
 
+using CryptoPro.Sharpei;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+
+using System.IO;
+using System.Runtime.Serialization.Formatters.Binary;
+
 namespace CryptoProClient
 {
     public partial class Form1 : Form
     {
+        string container_name = "le-4cd9f341-5657-4431-99f7-c7c4f33de108";
+        Gost3410 signature;
+        byte[] command;
+
         public Form1()
         {
             InitializeComponent();
@@ -22,7 +33,7 @@ namespace CryptoProClient
 
         private void Form1_Load(object sender, EventArgs e)
         {
-
+         
         }
 
         private void button3_Click(object sender, EventArgs e)
@@ -55,6 +66,63 @@ namespace CryptoProClient
             {
                 MessageBox.Show("SocketException: " + exception);
             }
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            Gost28147 gost = Gost28147.Create();
+            MemoryStream ms = new MemoryStream();
+            CryptoStream cs = new CryptoStream(ms, gost.CreateEncryptor(),  CryptoStreamMode.Write);
+            
+            string plain_text = richTextBox1.Text;
+            byte[] plain_text_bytes = Encoding.ASCII.GetBytes(plain_text);
+
+            cs.Write(plain_text_bytes, 0, plain_text_bytes.Length);
+            cs.FlushFinalBlock();
+
+            byte[] cipher_text_bytes = ms.ToArray();
+            
+            cs.Close();
+            ms.Close();
+
+        }
+
+        private void richTextBox1_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            X509Certificate2 cert = get_certificate_by_name("flex2424");
+
+        }
+
+        private X509Certificate2 get_certificate_by_name(string name)
+        {
+           X509Store store = new X509Store(StoreLocation.CurrentUser);
+           store.Open(OpenFlags.OpenExistingOnly | OpenFlags.ReadOnly);
+           X509Certificate2Collection found =
+               store.Certificates.Find(X509FindType.FindBySubjectName, name, false);
+
+           // Проверяем, что нашли ровно один сертификат.
+           if (found.Count == 0)
+           {
+               MessageBox.Show("Сертификат не найден.");
+               return null;
+           }
+           if (found.Count > 1)
+           {
+               MessageBox.Show("Найдено более одного сертификата.");
+               return null;
+           }
+           X509Certificate2 cert = found[0];
+           return cert;
         }
     }
 }
