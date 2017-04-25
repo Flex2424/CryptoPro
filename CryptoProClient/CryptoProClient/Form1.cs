@@ -94,6 +94,14 @@ namespace CryptoProClient
 
         private void button2_Click(object sender, EventArgs e)
         {
+            string plain_text = richTextBox1.Text;
+            byte[] plain_text_bytes = Encoding.ASCII.GetBytes(plain_text);
+
+            Gost3410CryptoServiceProvider gost = new Gost3410CryptoServiceProvider();
+            Gost3411CryptoServiceProvider hash = new Gost3411CryptoServiceProvider();
+
+            byte[] signature = gost.SignData(plain_text_bytes, hash);
+            
 
         }
 
