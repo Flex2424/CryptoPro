@@ -22,8 +22,11 @@ namespace CryptoProClient
 {
     public partial class Form1 : Form
     {
-        //string container_name = "le-4cd9f341-5657-4431-99f7-c7c4f33de108";
+        const string container_name = "le-4cd9f341-5657-4431-99f7-c7c4f33de108";
         byte[] mode;
+        X509Certificate2 cert;
+        Gost3410CryptoServiceProvider csp;
+        Gost3410 sign;
 
         public Form1()
         {
@@ -35,6 +38,11 @@ namespace CryptoProClient
             mode = new byte[2];
             mode[0] = 0x01;
             mode[1] = 0x02;
+
+            cert = get_certificate_by_name("flex2424");
+            CspParameters csp_params = new CspParameters(75, null, container_name);
+            csp = new Gost3410CryptoServiceProvider(csp_params);
+            sign = cert.PublicKey.Key as Gost3410;
 
             foreach (StoreLocation storeLocation in (StoreLocation[])
                 Enum.GetValues(typeof(StoreLocation)))
@@ -50,9 +58,9 @@ namespace CryptoProClient
                             try
                             {
                                 store.Open(OpenFlags.OpenExistingOnly);
-                                foreach (X509Certificate2 cert in store.Certificates)
+                                foreach (X509Certificate2 certificate in store.Certificates)
                                 {
-                                    comboBox1.Items.Add(cert.GetName());
+                                    comboBox1.Items.Add(certificate.GetName());
                                 }
                             }
                             catch (CryptographicException)
@@ -99,22 +107,26 @@ namespace CryptoProClient
         private void button1_Click(object sender, EventArgs e)
         {
             Gost28147 gost = Gost28147.Create();
+            Gost3410Parameters public_key = csp.ExportParameters(false);
+            GostSharedSecretAlgorithm agree_key = csp.CreateAgree(sign.ExportParameters(false));
+            byte[] wrapped_key = agree_key.Wrap(gost, GostKeyWrapMethod.CryptoProKeyWrap);
+            BinaryFormatter bf = new BinaryFormatter();
             MemoryStream ms = new MemoryStream();
-            CryptoStream cs = new CryptoStream(ms, gost.CreateEncryptor(),  CryptoStreamMode.Write);
-            
+            bf.Serialize(ms, public_key);
+            byte[] public_key_bytes = ms.ToArray();
+            ms.Close();
+
+            MemoryStream memory_stream = new MemoryStream();
+            CryptoStream cs = new CryptoStream(memory_stream, gost.CreateEncryptor(), CryptoStreamMode.Write);
             string plain_text = richTextBox1.Text;
             byte[] plain_text_bytes = Encoding.ASCII.GetBytes(plain_text);
 
             cs.Write(plain_text_bytes, 0, plain_text_bytes.Length);
             cs.FlushFinalBlock();
 
-            byte[] cipher_text_bytes = ms.ToArray();
-            
+            byte[] cipher_text_bytes = memory_stream.ToArray();
+            memory_stream.Close();
             cs.Close();
-            ms.Close();
-
-            send_data("encryption", cipher_text_bytes);
-
         }
 
         private void richTextBox1_TextChanged(object sender, EventArgs e)
@@ -133,12 +145,6 @@ namespace CryptoProClient
             byte[] signature = gost.SignData(plain_text_bytes, hash);
 
             send_data("signature", signature);
-
-        }
-
-        private void button4_Click(object sender, EventArgs e)
-        {
-            X509Certificate2 cert = get_certificate_by_name("flex2424");
 
         }
 
