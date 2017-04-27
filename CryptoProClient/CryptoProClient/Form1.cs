@@ -127,6 +127,28 @@ namespace CryptoProClient
             byte[] cipher_text_bytes = memory_stream.ToArray();
             memory_stream.Close();
             cs.Close();
+
+            //send data
+            try
+            {
+                Int32 port = 9595;
+                TcpClient client = new TcpClient("127.0.0.1", port);
+                NetworkStream stream = client.GetStream();
+
+                stream.Write(mode, 0, 1);
+                stream.Write(cipher_text_bytes, 0, cipher_text_bytes.Length);
+                stream.Close();
+                client.Close();
+
+            }
+            catch (ArgumentNullException exception)
+            {
+                MessageBox.Show("ArgumentNullException: " + exception);
+            }
+            catch (SocketException exception)
+            {
+                MessageBox.Show("SocketException: " + exception);
+            }
         }
 
         private void richTextBox1_TextChanged(object sender, EventArgs e)
@@ -139,12 +161,32 @@ namespace CryptoProClient
             string plain_text = richTextBox1.Text;
             byte[] plain_text_bytes = Encoding.ASCII.GetBytes(plain_text);
 
-            Gost3410CryptoServiceProvider gost = new Gost3410CryptoServiceProvider();
             Gost3411CryptoServiceProvider hash = new Gost3411CryptoServiceProvider();
+            byte[] signature = csp.SignData(plain_text_bytes, hash);
 
-            byte[] signature = gost.SignData(plain_text_bytes, hash);
+            //send data
+            try
+            {
+                Int32 port = 9595;
+                TcpClient client = new TcpClient("127.0.0.1", port);
+                NetworkStream stream = client.GetStream();
 
-            send_data("signature", signature);
+                stream.Write(mode, 1, 1);
+                stream.Write(signature, 0, signature.Length);
+                stream.Write(plain_text_bytes, 0, plain_text_bytes.Length);
+                stream.Close();
+                client.Close();
+
+            }
+            catch (ArgumentNullException exception)
+            {
+                MessageBox.Show("ArgumentNullException: " + exception);
+            }
+            catch (SocketException exception)
+            {
+                MessageBox.Show("SocketException: " + exception);
+            }
+
 
         }
 
@@ -170,6 +212,7 @@ namespace CryptoProClient
            return cert;
         }
 
+        /*
         private void send_data(string flag, byte[] data)
         {
             try
@@ -209,6 +252,7 @@ namespace CryptoProClient
                 MessageBox.Show("SocketException: " + exception);
             }
         }
+        */
         
     }
 }
