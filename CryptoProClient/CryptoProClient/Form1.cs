@@ -280,9 +280,8 @@ namespace CryptoProClient
                 BERelement main_seq = new BERelement(0x30);
                 BERelement sign_seq = new BERelement(0x30);
 
-                //sign_seq.AddItem(new BERelement(0x0c, Encoding.UTF8.GetBytes("sign")));
-                sign_seq.AddItem(new BERelement(0x02, signature));
-                sign_seq.AddItem(new BERelement(0x02, plain_text_bytes));
+                sign_seq.AddItem(new BERelement(0x04, signature));
+                sign_seq.AddItem(new BERelement(0x04, plain_text_bytes));
 
                 main_seq.AddItem(sign_seq);
                 byte[] test = main_seq.GetEncodedPacket().ToArray();
@@ -341,15 +340,15 @@ namespace CryptoProClient
                 BERelement main_seq = new BERelement(0x30);
                 BERelement sign_seq = new BERelement(0x30);
 
-                sign_seq.AddItem(new BERelement(0x02, wrapped_key));
-                sign_seq.AddItem(new BERelement(0x02, gost.IV));
-                sign_seq.AddItem(new BERelement(0x02, public_key_bytes));
-                sign_seq.AddItem(new BERelement(0x02, cipher_text_bytes));
+                sign_seq.AddItem(new BERelement(0x04, wrapped_key));
+                sign_seq.AddItem(new BERelement(0x04, gost.IV));
+                sign_seq.AddItem(new BERelement(0x04, public_key_bytes));
+                sign_seq.AddItem(new BERelement(0x04, cipher_text_bytes));
 
                 main_seq.AddItem(sign_seq);
                 byte[] test = main_seq.GetEncodedPacket().ToArray();
 
-                //File.WriteAllBytes("asn1", test);
+                File.WriteAllBytes("asn1", test);
 
                 /*
                 sign_seq.AddItem(new BERelement(0x02, signature));
