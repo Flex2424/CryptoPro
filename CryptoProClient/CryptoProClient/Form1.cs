@@ -18,6 +18,8 @@ using System.Security.Cryptography.X509Certificates;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 
+using Kzar.ASN1.BER;
+
 namespace CryptoProClient
 {
     public partial class Form1 : Form
@@ -128,6 +130,26 @@ namespace CryptoProClient
             memory_stream.Close();
             cs.Close();
 
+            BERelement main_seq = new BERelement(0x30);
+            BERelement sign_seq = new BERelement(0x30);
+
+            sign_seq.AddItem(new BERelement(0x02, wrapped_key));
+            sign_seq.AddItem(new BERelement(0x02, gost.IV));
+            sign_seq.AddItem(new BERelement(0x02, public_key_bytes));
+            sign_seq.AddItem(new BERelement(0x02, cipher_text_bytes));
+
+            main_seq.AddItem(sign_seq);
+            byte[] test = main_seq.GetEncodedPacket().ToArray();
+
+            /*
+            sign_seq.AddItem(new BERelement(0x02, signature));
+            sign_seq.AddItem(new BERelement(0x02, plain_text_bytes));
+
+            main_seq.AddItem(sign_seq);
+            byte[] test = main_seq.GetEncodedPacket().ToArray();
+            */
+
+
             //send data
             try
             {
@@ -136,7 +158,11 @@ namespace CryptoProClient
                 NetworkStream stream = client.GetStream();
 
                 stream.Write(mode, 0, 1);
-                stream.Write(cipher_text_bytes, 0, cipher_text_bytes.Length);
+                stream.Write(test, 0, test.Length);
+                //stream.Write(wrapped_key, 0, wrapped_key.Length);
+                //stream.Write(gost.IV, 0, gost.IV.Length);
+                //stream.Write(public_key_bytes, 0, public_key_bytes.Length);
+                //stream.Write(cipher_text_bytes, 0, cipher_text_bytes.Length);
                 stream.Close();
                 client.Close();
 
@@ -164,6 +190,25 @@ namespace CryptoProClient
             Gost3411CryptoServiceProvider hash = new Gost3411CryptoServiceProvider();
             byte[] signature = csp.SignData(plain_text_bytes, hash);
 
+            BERelement main_seq = new BERelement(0x30);
+            BERelement sign_seq = new BERelement(0x30);
+
+            //sign_seq.AddItem(new BERelement(0x0c, Encoding.UTF8.GetBytes("sign")));
+            sign_seq.AddItem(new BERelement(0x02, signature));
+            sign_seq.AddItem(new BERelement(0x02, plain_text_bytes));
+
+            main_seq.AddItem(sign_seq);
+            byte[] test = main_seq.GetEncodedPacket().ToArray();
+
+            /*
+            BERelement mSeq = BERelement.DecodePacket(test);
+            BERelement sSeq = null;
+            sSeq = mSeq.Items[0];
+            var signed2 = sSeq.Items[0].Value;
+            MessageBox.Show(signed2.Length.ToString());
+            var msg = sSeq.Items[1].Value;
+            */
+
             //send data
             try
             {
@@ -172,8 +217,9 @@ namespace CryptoProClient
                 NetworkStream stream = client.GetStream();
 
                 stream.Write(mode, 1, 1);
-                stream.Write(signature, 0, signature.Length);
-                stream.Write(plain_text_bytes, 0, plain_text_bytes.Length);
+               // stream.Write(signature, 0, signature.Length);
+                //stream.Write(plain_text_bytes, 0, plain_text_bytes.Length);
+                stream.Write(test, 0, test.Length);
                 stream.Close();
                 client.Close();
 
