@@ -141,6 +141,8 @@ namespace CryptoProClient
             main_seq.AddItem(sign_seq);
             byte[] test = main_seq.GetEncodedPacket().ToArray();
 
+            //File.WriteAllBytes("asn1", test);
+
             /*
             sign_seq.AddItem(new BERelement(0x02, signature));
             sign_seq.AddItem(new BERelement(0x02, plain_text_bytes));
@@ -200,6 +202,8 @@ namespace CryptoProClient
             main_seq.AddItem(sign_seq);
             byte[] test = main_seq.GetEncodedPacket().ToArray();
 
+            File.WriteAllBytes("asn2", test);
+
             /*
             BERelement mSeq = BERelement.DecodePacket(test);
             BERelement sSeq = null;
@@ -256,6 +260,132 @@ namespace CryptoProClient
            }
            X509Certificate2 cert = found[0];
            return cert;
+        }
+
+        private void radioButton1_CheckedChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            if (checkBox2.Checked)
+            {
+                string plain_text = richTextBox1.Text;
+                byte[] plain_text_bytes = Encoding.ASCII.GetBytes(plain_text);
+
+                Gost3411CryptoServiceProvider hash = new Gost3411CryptoServiceProvider();
+                byte[] signature = csp.SignData(plain_text_bytes, hash);
+
+                BERelement main_seq = new BERelement(0x30);
+                BERelement sign_seq = new BERelement(0x30);
+
+                //sign_seq.AddItem(new BERelement(0x0c, Encoding.UTF8.GetBytes("sign")));
+                sign_seq.AddItem(new BERelement(0x02, signature));
+                sign_seq.AddItem(new BERelement(0x02, plain_text_bytes));
+
+                main_seq.AddItem(sign_seq);
+                byte[] test = main_seq.GetEncodedPacket().ToArray();
+
+                File.WriteAllBytes("asn2", test);
+
+                try
+                {
+                    Int32 port = 9595;
+                    TcpClient client = new TcpClient("127.0.0.1", port);
+                    NetworkStream stream = client.GetStream();
+
+                    stream.Write(mode, 1, 1);
+                    // stream.Write(signature, 0, signature.Length);
+                    //stream.Write(plain_text_bytes, 0, plain_text_bytes.Length);
+                    stream.Write(test, 0, test.Length);
+                    stream.Close();
+                    client.Close();
+
+                }
+                catch (ArgumentNullException exception)
+                {
+                    MessageBox.Show("ArgumentNullException: " + exception);
+                }
+                catch (SocketException exception)
+                {
+                    MessageBox.Show("SocketException: " + exception);
+                }
+
+
+            }
+            else if (checkBox1.Checked)
+            {
+                Gost28147 gost = Gost28147.Create();
+                Gost3410Parameters public_key = csp.ExportParameters(false);
+                GostSharedSecretAlgorithm agree_key = csp.CreateAgree(sign.ExportParameters(false));
+                byte[] wrapped_key = agree_key.Wrap(gost, GostKeyWrapMethod.CryptoProKeyWrap);
+                BinaryFormatter bf = new BinaryFormatter();
+                MemoryStream ms = new MemoryStream();
+                bf.Serialize(ms, public_key);
+                byte[] public_key_bytes = ms.ToArray();
+                ms.Close();
+
+                MemoryStream memory_stream = new MemoryStream();
+                CryptoStream cs = new CryptoStream(memory_stream, gost.CreateEncryptor(), CryptoStreamMode.Write);
+                string plain_text = richTextBox1.Text;
+                byte[] plain_text_bytes = Encoding.ASCII.GetBytes(plain_text);
+
+                cs.Write(plain_text_bytes, 0, plain_text_bytes.Length);
+                cs.FlushFinalBlock();
+
+                byte[] cipher_text_bytes = memory_stream.ToArray();
+                memory_stream.Close();
+                cs.Close();
+
+                BERelement main_seq = new BERelement(0x30);
+                BERelement sign_seq = new BERelement(0x30);
+
+                sign_seq.AddItem(new BERelement(0x02, wrapped_key));
+                sign_seq.AddItem(new BERelement(0x02, gost.IV));
+                sign_seq.AddItem(new BERelement(0x02, public_key_bytes));
+                sign_seq.AddItem(new BERelement(0x02, cipher_text_bytes));
+
+                main_seq.AddItem(sign_seq);
+                byte[] test = main_seq.GetEncodedPacket().ToArray();
+
+                //File.WriteAllBytes("asn1", test);
+
+                /*
+                sign_seq.AddItem(new BERelement(0x02, signature));
+                sign_seq.AddItem(new BERelement(0x02, plain_text_bytes));
+
+                main_seq.AddItem(sign_seq);
+                byte[] test = main_seq.GetEncodedPacket().ToArray();
+                */
+
+
+                //send data
+                try
+                {
+                    Int32 port = 9595;
+                    TcpClient client = new TcpClient("127.0.0.1", port);
+                    NetworkStream stream = client.GetStream();
+
+                    stream.Write(mode, 0, 1);
+                    stream.Write(test, 0, test.Length);
+                    //stream.Write(wrapped_key, 0, wrapped_key.Length);
+                    //stream.Write(gost.IV, 0, gost.IV.Length);
+                    //stream.Write(public_key_bytes, 0, public_key_bytes.Length);
+                    //stream.Write(cipher_text_bytes, 0, cipher_text_bytes.Length);
+                    stream.Close();
+                    client.Close();
+
+                }
+                catch (ArgumentNullException exception)
+                {
+                    MessageBox.Show("ArgumentNullException: " + exception);
+                }
+                catch (SocketException exception)
+                {
+                    MessageBox.Show("SocketException: " + exception);
+                }
+            }
         }
 
         /*
