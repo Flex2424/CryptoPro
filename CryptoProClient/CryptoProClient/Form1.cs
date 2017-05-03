@@ -25,6 +25,7 @@ namespace CryptoProClient
     public partial class Form1 : Form
     {
         const string container_name = "le-4cd9f341-5657-4431-99f7-c7c4f33de108";
+        const string cert_name = "flex2424";
         byte[] mode;
         X509Certificate2 cert;
         Gost3410CryptoServiceProvider csp;
@@ -37,9 +38,10 @@ namespace CryptoProClient
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            mode = new byte[2];
+            mode = new byte[3];
             mode[0] = 0x01;
             mode[1] = 0x02;
+            mode[2] = 0x03;
 
             cert = get_certificate_by_name("flex2424");
             CspParameters csp_params = new CspParameters(75, null, container_name);
@@ -269,7 +271,7 @@ namespace CryptoProClient
 
         private void button4_Click(object sender, EventArgs e)
         {
-            if (checkBox2.Checked)
+            if (checkBox2.Checked && !checkBox1.Checked)
             {
                 string plain_text = richTextBox1.Text;
                 byte[] plain_text_bytes = Encoding.ASCII.GetBytes(plain_text);
@@ -277,16 +279,18 @@ namespace CryptoProClient
                 Gost3411CryptoServiceProvider hash = new Gost3411CryptoServiceProvider();
                 byte[] signature = csp.SignData(plain_text_bytes, hash);
 
+
                 BERelement main_seq = new BERelement(0x30);
                 BERelement sign_seq = new BERelement(0x30);
 
+                sign_seq.AddItem(new BERelement(0x0C, cert_name));
                 sign_seq.AddItem(new BERelement(0x04, signature));
                 sign_seq.AddItem(new BERelement(0x04, plain_text_bytes));
 
                 main_seq.AddItem(sign_seq);
                 byte[] test = main_seq.GetEncodedPacket().ToArray();
 
-                File.WriteAllBytes("asn2", test);
+                File.WriteAllBytes("signature", test);
 
                 try
                 {
@@ -295,8 +299,6 @@ namespace CryptoProClient
                     NetworkStream stream = client.GetStream();
 
                     stream.Write(mode, 1, 1);
-                    // stream.Write(signature, 0, signature.Length);
-                    //stream.Write(plain_text_bytes, 0, plain_text_bytes.Length);
                     stream.Write(test, 0, test.Length);
                     stream.Close();
                     client.Close();
@@ -313,7 +315,7 @@ namespace CryptoProClient
 
 
             }
-            else if (checkBox1.Checked)
+            else if (checkBox1.Checked && !checkBox2.Checked)
             {
                 Gost28147 gost = Gost28147.Create();
                 Gost3410Parameters public_key = csp.ExportParameters(false);
@@ -340,6 +342,7 @@ namespace CryptoProClient
                 BERelement main_seq = new BERelement(0x30);
                 BERelement sign_seq = new BERelement(0x30);
 
+                sign_seq.AddItem(new BERelement(0x0C, cert_name));
                 sign_seq.AddItem(new BERelement(0x04, wrapped_key));
                 sign_seq.AddItem(new BERelement(0x04, gost.IV));
                 sign_seq.AddItem(new BERelement(0x04, public_key_bytes));
@@ -348,18 +351,8 @@ namespace CryptoProClient
                 main_seq.AddItem(sign_seq);
                 byte[] test = main_seq.GetEncodedPacket().ToArray();
 
-                File.WriteAllBytes("asn1", test);
+                File.WriteAllBytes("encryption", test);
 
-                /*
-                sign_seq.AddItem(new BERelement(0x02, signature));
-                sign_seq.AddItem(new BERelement(0x02, plain_text_bytes));
-
-                main_seq.AddItem(sign_seq);
-                byte[] test = main_seq.GetEncodedPacket().ToArray();
-                */
-
-
-                //send data
                 try
                 {
                     Int32 port = 9595;
@@ -368,10 +361,6 @@ namespace CryptoProClient
 
                     stream.Write(mode, 0, 1);
                     stream.Write(test, 0, test.Length);
-                    //stream.Write(wrapped_key, 0, wrapped_key.Length);
-                    //stream.Write(gost.IV, 0, gost.IV.Length);
-                    //stream.Write(public_key_bytes, 0, public_key_bytes.Length);
-                    //stream.Write(cipher_text_bytes, 0, cipher_text_bytes.Length);
                     stream.Close();
                     client.Close();
 
@@ -384,6 +373,86 @@ namespace CryptoProClient
                 {
                     MessageBox.Show("SocketException: " + exception);
                 }
+            }
+            else if (checkBox2.Checked && checkBox1.Checked)
+            {
+                MessageBox.Show("suka!");
+
+                string plain_text = richTextBox1.Text;
+                byte[] plain_text_bytes = Encoding.ASCII.GetBytes(plain_text);
+
+                Gost3411CryptoServiceProvider hash = new Gost3411CryptoServiceProvider();
+                byte[] signature = csp.SignData(plain_text_bytes, hash);
+
+
+                BERelement main_seq = new BERelement(0x30);
+                BERelement sign_seq = new BERelement(0x30);
+
+                sign_seq.AddItem(new BERelement(0x0C, cert_name));
+                sign_seq.AddItem(new BERelement(0x04, signature));
+                sign_seq.AddItem(new BERelement(0x04, plain_text_bytes));
+
+                main_seq.AddItem(sign_seq);
+                byte[] test = main_seq.GetEncodedPacket().ToArray();
+
+                File.WriteAllBytes("signature_and_encryption", test);
+
+                Gost28147 gost = Gost28147.Create();
+                Gost3410Parameters public_key = csp.ExportParameters(false);
+                GostSharedSecretAlgorithm agree_key = csp.CreateAgree(sign.ExportParameters(false));
+                byte[] wrapped_key = agree_key.Wrap(gost, GostKeyWrapMethod.CryptoProKeyWrap);
+                BinaryFormatter bf = new BinaryFormatter();
+                MemoryStream ms = new MemoryStream();
+                bf.Serialize(ms, public_key);
+                byte[] public_key_bytes = ms.ToArray();
+                ms.Close();
+
+                MemoryStream memory_stream = new MemoryStream();
+                CryptoStream cs = new CryptoStream(memory_stream, gost.CreateEncryptor(), CryptoStreamMode.Write);
+                //string plain_text = richTextBox1.Text;
+                //byte[] plain_text_bytes = Encoding.ASCII.GetBytes(plain_text);
+
+                byte[] plain_text_bytes2 = test;
+                cs.Write(plain_text_bytes2, 0, plain_text_bytes2.Length);
+                cs.FlushFinalBlock();
+
+                byte[] cipher_text_bytes2 = memory_stream.ToArray();
+                memory_stream.Close();
+                cs.Close();
+
+                BERelement main_seq2 = new BERelement(0x30);
+                BERelement sign_seq2 = new BERelement(0x30);
+
+                sign_seq2.AddItem(new BERelement(0x0C, cert_name));
+                sign_seq2.AddItem(new BERelement(0x04, wrapped_key));
+                sign_seq2.AddItem(new BERelement(0x04, gost.IV));
+                sign_seq2.AddItem(new BERelement(0x04, public_key_bytes));
+                sign_seq2.AddItem(new BERelement(0x04, cipher_text_bytes2));
+
+                main_seq2.AddItem(sign_seq2);
+                byte[] test2 = main_seq2.GetEncodedPacket().ToArray();
+
+                try
+                {
+                    Int32 port = 9595;
+                    TcpClient client = new TcpClient("127.0.0.1", port);
+                    NetworkStream stream = client.GetStream();
+
+                    stream.Write(mode, 2, 1);
+                    stream.Write(test2, 0, test2.Length);
+                    stream.Close();
+                    client.Close();
+
+                }
+                catch (ArgumentNullException exception)
+                {
+                    MessageBox.Show("ArgumentNullException: " + exception);
+                }
+                catch (SocketException exception)
+                {
+                    MessageBox.Show("SocketException: " + exception);
+                }
+
             }
         }
 
